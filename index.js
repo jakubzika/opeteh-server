@@ -87,7 +87,7 @@ function onMessageHandler(id) {
           if (room) {
             if(rooms.hasOwnProperty(room)) {
               if (rooms[room].clients.length <= rooms[room].maxClients) {
-                if (!rooms[room].includes(id)) {
+                if (!rooms[room].clients.includes(id)) {
                   rooms[room].clients.push(id);
                   connectedClients[id].room = room;
                   connectedClients[id].connection.send(formatMessage('session', {
