@@ -27,22 +27,25 @@ function createRoom(serverId, maxClients) {
 
 wss.on('connection', function(client) {
   console.log('___');
-  var id;
+  var userId;
   do {
-    id = Math.random().toString(36).substr(2, 9);
-  } while(Object.hasOwnProperty(id));
+    userId = Math.random().toString(36).substr(2, 9);
+  } while(Object.hasOwnProperty(userId));
 
-  connectedClients[id] = {
+  connectedClients[userId] = {
     connection: client
   };
-  client.on('message', onMessageHandler(id));
+  client.on('message', onMessageHandler(userId));
   client.send(formatMessage('info', {
-    id: id
+    id: userId,
   }));
 });
 
-function getRoom(id) {
-  return connectedClients[id].room;
+function getRoom(userId) {
+  if(connectedClients[userId].room) {
+    return rooms[connectedClients[userId].room];
+  }
+  return false;
 }
 
 function getServer(id) {
@@ -56,18 +59,15 @@ function isInRoom(id, room) {
 function onMessageHandler(id) {
   return function(messageString) {
     message = JSON.parse(messageString);
-    // console.log('message from ' + id + ' with type ' + message.type);
-    // console.log('message payload:\n' + JSON.stringify(message.data, null, 2) + '\n');
-    console.log(JSON.stringify(rooms, null, 2));
+
+    var room = getRoom(id);
     switch (message.type) {
       case 'info':
         var type = message.data.type;
         if (type === SERVER || type === CLIENT) {
           connectedClients[id].type = type;
         }
-        var room;
         if (type === SERVER) {
-          server = id;
           console.log(id + ' is server');
         } else if (type === CLIENT) {
 
@@ -76,13 +76,15 @@ function onMessageHandler(id) {
       case 'session':
         if (connectedClients[id].type === SERVER) {
           var maxConnections = message.data.maxConnections ? message.data.maxConnections : 5;
-          room = createRoom(id, maxConnections);
+
+          var room = createRoom(id, maxConnections);
           connectedClients[id].connection.send(formatMessage('session', {
             room: room,
-            error: false
+            id: id,
+            error: false,
           }))
         } else {
-          room = message.data.room;
+          var room = message.data.room;
           // TODO: better structure
           if (room) {
             if(rooms.hasOwnProperty(room)) {
@@ -91,7 +93,8 @@ function onMessageHandler(id) {
                   rooms[room].clients.push(id);
                   connectedClients[id].room = room;
                   connectedClients[id].connection.send(formatMessage('session', {
-                    error: false
+                    error: false,
+                    id: id,
                   }));
                 } else {
                   connectedClients[id].connection.send(formatMessage('session', {
@@ -128,7 +131,7 @@ function onMessageHandler(id) {
         connectedClients[id].connection.send(formatMessage('test', 'testing data'));
         break;
       case 'ice':
-        connectedClients[message.to ? message.to : server].connection.send(formatMessage('ice', message.data), id);
+        connectedClients[message.to ? message.to : room.server].connection.send(formatMessage('ice', message.data), id);
         break;
       default:
         console.log('Unknown message type');
